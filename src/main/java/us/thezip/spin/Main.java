@@ -1,5 +1,6 @@
 package us.thezip.spin;
 
+import org.apache.commons.lang.time.DurationFormatUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -152,7 +153,7 @@ public class Main extends JavaPlugin implements Listener {
             cannotTake.put(player.getUniqueId(), true);
             return false;
         } else {
-            player.sendMessage(ChatColor.RED + "You have " + ChatColor.GOLD + (Cooldown.getCooldown(player, "Spin") / 1000) + ChatColor.RED + " seconds left.");
+            player.sendMessage(ChatColor.RED + "You have " + ChatColor.GOLD + DurationFormatUtils.formatDurationWords(Cooldown.getCooldown(player, "Spin"), true, true) + ChatColor.RED + " seconds left.");
             return true;
         }
     }

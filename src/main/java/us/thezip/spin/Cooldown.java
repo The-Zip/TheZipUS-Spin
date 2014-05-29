@@ -1,8 +1,8 @@
 package us.thezip.spin;
-import org.bukkit.entity.Player;
 
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Table;
+import org.bukkit.entity.Player;
 
 public class Cooldown {
     private static Table<String, String, Long> cooldowns = HashBasedTable.create();
