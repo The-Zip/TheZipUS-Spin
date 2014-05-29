@@ -1,0 +1,7 @@
+name: HavocLotto
+version: 0.1
+authors: [The_Zip, charries96]
+main: us.thezip.spin.Main
+commands:
+  spin:
+    description: Try your luck at winning some items every 24 hours.
