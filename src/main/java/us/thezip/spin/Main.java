@@ -6,44 +6,66 @@ import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Properties;
-import java.util.Random;
+import java.util.*;
 
 @SuppressWarnings("unused")
-public class Main extends JavaPlugin {
-    private List<ItemStack> rewards = new ArrayList<ItemStack>();
-    private Properties properties = new Properties();
+public class Main extends JavaPlugin implements Listener {
+    private WeakHashMap<UUID, Boolean> cannotTake = new WeakHashMap<>();
+    private String title = ChatColor.YELLOW + "Havoc Lottery";
+    private List<ItemStack> rewards = new ArrayList<>();
     private Inventory base = null;
-    private int randomness = 6;
-    private String title = "";
 
     @Override
     public void onEnable() {
         loadConfig();
-        base = Bukkit.createInventory(null, 9, properties.getProperty("title"));
+        base = Bukkit.createInventory(null, 9, title == null ? ChatColor.YELLOW + "Havoc Lottery" : title);
     }
 
     public void doRandomInventory(final Player player) {
         if(player.getOpenInventory() != null)
             player.closeInventory();
+        cannotTake.put(player.getUniqueId(), true);
         final Inventory inventory = base;
-
         player.openInventory(inventory);
-        Bukkit.getServer().getScheduler().scheduleSyncRepeatingTask(this, new Runnable() {
+
+        new BukkitRunnable() {
+            int counter = 0;
             @Override
             public void run() {
-                for (int i = 0; i < 5; i++) {
-                    int thisRandom = getRandom(rewards.size());
-                    inventory.setItem(2 + i, rewards.get(thisRandom));
+                if(counter < 5 && rewards.size() > 0) {
+                    for (int i = 0; i < 5; i++) {
+                        int thisRandom = getRandom(rewards.size());
+                        inventory.setItem(2 + i, rewards.get(thisRandom));
+                    }
+                    counter++;
+                } else {
+                    cannotTake.put(player.getUniqueId(), false);
+                    this.cancel();
                 }
             }
-        }, 0, 5L);
+
+        }.runTaskTimer(this, 0, 10L);
+    }
+
+    @EventHandler
+    public void takeItems(InventoryClickEvent event)
+    {
+        if(event.getSlotType() == InventoryType.SlotType.CONTAINER)
+        {
+            if(cannotTake.get(event.getWhoClicked().getUniqueId())) {
+                event.setCursor(null);
+                event.setCancelled(true);
+            }
+        }
     }
 
     /**
@@ -53,27 +75,28 @@ public class Main extends JavaPlugin {
      */
     private Integer getRandom(Integer maximum) {
         Random random = new Random();
-        int x = 0;
-        for(int i = 0; i < randomness; i++)
-            x += random.nextInt(maximum);
-        return (x / randomness);
+        return (random.nextInt(maximum) + random.nextInt(maximum) + random.nextInt(maximum) + random.nextInt(maximum)) / 4;
     }
 
     /**
      * Load the item list and quantities, etc, add to HashMap and set window title.
      */
     private void loadConfig() {
-        title = getConfig().getString("title");
-        for(String s : getConfig().getStringList("items"))
+        this.saveDefaultConfig();
+        title = getConfig().getString("spin.title");
+        title = title.contains("&") ? ChatColor.translateAlternateColorCodes('&', title) : title;
+        Bukkit.getServer().getPluginManager().registerEvents(this, this);
+
+        for(String s : getConfig().getStringList("spin.items"))
         {
             String item = "COAL";
             String parseInt = "1";
             int quantity = 1;
-
             try {
                 String[] lines = s.split(":");
                 item = lines[0].toUpperCase();
                 parseInt = lines[1];
+                getLogger().info("Added " + parseInt + "x " + item + " to reward list.");
             } catch (Exception ex) {
                 ex.printStackTrace();
             } finally {
@@ -93,11 +116,12 @@ public class Main extends JavaPlugin {
 
     @Override
     public boolean onCommand(CommandSender commandSender, Command command, String alias, String[] strings) {
-        if(command.getName().equalsIgnoreCase("spin"))
+        if(command.getName().equalsIgnoreCase("spin") || alias.equalsIgnoreCase("lotto"))
         {
             if(commandSender instanceof Player) {
                 Player player = (Player) commandSender;
-                doRandomInventory(player);
+                if(!hasCooldown(player))
+                    doRandomInventory(player);
             } else {
                 if(strings.length < 1) {
                     commandSender.sendMessage(ChatColor.DARK_RED + "Insufficient arguments provided!");
@@ -121,5 +145,15 @@ public class Main extends JavaPlugin {
             return true;
         }
         return false;
+    }
+
+    public boolean hasCooldown(Player player) {
+        if (Cooldown.tryCooldown(player, "Spin", 28800000)) {
+            cannotTake.put(player.getUniqueId(), true);
+            return false;
+        } else {
+            player.sendMessage(ChatColor.RED + "You have " + ChatColor.GOLD + (Cooldown.getCooldown(player, "Spin") / 1000) + ChatColor.RED + " seconds left.");
+            return true;
+        }
     }
 }
